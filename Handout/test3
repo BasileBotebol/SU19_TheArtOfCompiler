@@ -1,0 +1,37 @@
+long x;
+long a, b;
+
+long add(long p1, p2) {
+    return p1 + p2;
+}
+
+void test_empty(){
+	return; 
+}
+
+void count(long N) {
+    print "Counting to \"test\"";
+    write N;
+
+
+    long i;
+    long a;
+    i = 0;
+    while (i < N) {
+        write i;
+        i = i + 1;
+
+    }
+}
+long n;
+{
+test_empty();
+    long n;
+	long i;
+
+    print "Enter n: ";
+    read n;
+    write add(1, n);
+    count(n);
+
+}
