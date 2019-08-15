@@ -1,0 +1,47 @@
+long isPrime(long p) {
+	if (p < 2) {
+		return 0;
+	}
+	else if (p == 2) {
+		return 1;
+	}
+	
+	long i;
+	i = 3;
+	while (i * i <= p) {
+		if (p % i == 0) {
+			return 0;
+		}
+		i = i + 2;
+	}
+
+	return 1;
+}
+
+void writeln(long l) {
+	write l;
+	print "\n";
+}
+
+long sum, n;
+sum = 0;
+
+{
+	print "Enter n: ";
+	read n;
+
+	long i;
+	i = 2;
+	while (i <= n) {
+		if (isPrime(i) == 1) {
+			sum = sum + i;
+
+			print "\t";
+			write n;
+			print " is prime.\n";
+		}
+	}
+
+	print "Sum: ";
+	writeln(sum);
+}
