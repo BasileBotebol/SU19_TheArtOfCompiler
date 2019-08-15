@@ -1,9 +1,9 @@
 {
 long b;
-b = 10;
-if(b < 1000){
-print "dans le if";
-}else{
-print "\n------------------- pas dans le if\n"; 
+b = 1;
+while (b < 10)
+{
+b = b + 1;
+print "un tour de plus";
 }
 }

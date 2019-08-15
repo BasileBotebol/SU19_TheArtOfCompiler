@@ -104,7 +104,7 @@ extern char *yytext;
 %type<idl>  identl vardecl
 %type<lval> argl
 %type<opcode> condition
-%type<bpr> IF
+%type<bpr> IF WHILE
 
 %%
 
@@ -207,6 +207,7 @@ fundecl		:
 		}
 		stmtblock
     {
+        add_op(cb, opReturn, NULL);
         dump_codeblock(cb); save_codeblock(cb, fn_pfx);
         Stack *pstck = stack; stack = stack->uplink; delete_stack(pstck);
         Symtab *pst = symtab; symtab = symtab->parent; delete_symtab(pst);
@@ -217,62 +218,82 @@ stmtblock   	:
             	'{' stmts'}'
             	;
 
-stmts	 	:stmt
-		| stmt stmts
-		;
+stmts	 	:
+          stmt
+      		| stmt stmts
+      		;
 
-stmt 		:%empty
-		|vardecl ';'
-		|assign
-		|if
-		|while
-		|call ';'
-		|return
-		|read
-		|write
-		|print
-		;
+stmt 	    :
+              %empty
+          		|vardecl ';'
+          		|assign
+          		|if
+          		|while
+          		|call ';'
+          		|return
+          		|read
+          		|write
+          		|print
+          		;
 
 assign		:
-		ident '=' expression
+          		ident '=' expression
 
-        ';'	{
-            Symbol *s = find_symbol(symtab, $ident, sLocal);
-						if (s == NULL) {
-                                                    char *error = NULL;
-                                                    asprintf(&error, "Unknown identifier '%s'.", $ident);
-                                                    yyerror(error);
-                                                    free(error);
-                                                    YYABORT;
-                                                  }
-            add_op(cb, opStore, s);
-						}
-		;
+                  ';'	{
+                      Symbol *s = find_symbol(symtab, $ident, sLocal);
+          						if (s == NULL) {
+                          char *error = NULL;
+                          asprintf(&error, "Unknown identifier '%s'.", $ident);
+                          yyerror(error);
+                          free(error);
+                          YYABORT;
+                      }
+                      add_op(cb, opStore, s);
+          						}
+          		;
 
 if		:
-      IF '(' condition ')' {/*
-        $IF = (BPrecord*)calloc(1, sizeof(BPrecord));
-        Operation *tp = add_op(cb, $condition, (void*)OPID_INVALID);
-        Operation *fb = add_op(cb, opJump, (void*)OPID_INVALID);
-        $IF->ttrue = add_backpatch($IF->ttrue, tp);
-        $IF->tfalse = add_backpatch($IF->tfalse, fb);*/
-      }
-      stmtblock{/*
-        Operation *next = add_op(cb, opJump, (void*)OPID_INVALID);
-        $IF->end = add_backpatch($IF->end, next);
-        pending_backpatch(cb, $IF->tfalse);*/
-      }
-      else{/*
-        pending_backpatch(cb, $IF->end);*/
-      }
-		;
+          IF '(' condition ')' {
+            $IF = (BPrecord*)calloc(1, sizeof(BPrecord));
+            Operation *tp = add_op(cb, $condition, (void*)OPID_INVALID);
+            Operation *fb = add_op(cb, opJump, (void*)OPID_INVALID);
+            $IF->ttrue = add_backpatch($IF->ttrue, tp);
+            $IF->tfalse = add_backpatch($IF->tfalse, fb);
+            pending_backpatch(cb, $IF->ttrue);
+          }
+          stmtblock{
+            Operation *next = add_op(cb, opJump, (void*)OPID_INVALID);
+            $IF->end = add_backpatch($IF->end, next);
+            pending_backpatch(cb, $IF->tfalse);
+          }
+          else{
+            pending_backpatch(cb, $IF->end);
+          }
+    		;
 
 else  :%empty
       |ELSE stmtblock
       ;
 while		:
-		WHILE '('condition ')' stmtblock
-		;
+        		WHILE
+            {
+              $WHILE = (BPrecord*)calloc(1,sizeof(BPrecord));
+              $WHILE->pos = cb->nops;
+            }
+            '('condition ')'
+            {
+              Operation *tb = add_op(cb,$condition,(void*)OPID_INVALID);
+              Operation *next = add_op(cb,opJump,(void*)OPID_INVALID);
+              $WHILE->ttrue = add_backpatch($WHILE->ttrue,tb);
+              $WHILE->end = add_backpatch($WHILE->end,next);
+              pending_backpatch(cb,$WHILE->ttrue);
+            }
+            stmtblock
+            {
+            add_op(cb,opJump,(void*)(long int)$WHILE->pos);
+            pending_backpatch(cb,$WHILE->end);
+            }
+        		;
 
 call		:
 		ident '(' argl ')'
@@ -293,85 +314,85 @@ call		:
       add_op(cb, opCall, functioncalled->id);
 		}
 		;
-return : RETURN ';'
-{
-   if (rettype!= tVoid) {
-  yyerror("No return in non-void function.");
-  YYABORT;
-  }
-}
+return :
+          RETURN ';'
+          {
+             if (rettype!= tVoid) {
+            yyerror("No return in non-void function.");
+            YYABORT;
+            }
+          }
 
-| RETURN expression ';'
-{
-  if (rettype == tVoid) {
-  yyerror("Void function returning non-void expression.");
-  YYABORT;
-  }
-
-  add_op(cb, opReturn, NULL);
-}
-;
+          | RETURN expression ';'
+          {
+            if (rettype == tVoid) {
+            yyerror("Void function returning non-void expression.");
+            YYABORT;
+            }
+          }
+          ;
 
 
 read		:
-		READ ident ';'
-    {  Symbol *s = find_symbol(symtab, $ident, sLocal);
-              if (s == NULL) {
-              char *error = NULL;
-              asprintf(&error, "Unknown identifier '%s'.", $ident);
-              yyerror(error);
-              free(error);
-              YYABORT;
-              }
-    add_op(cb, opRead, s);
-  }
-		;
+        		READ ident ';'
+            {  Symbol *s = find_symbol(symtab, $ident, sLocal);
+                      if (s == NULL) {
+                      char *error = NULL;
+                      asprintf(&error, "Unknown identifier '%s'.", $ident);
+                      yyerror(error);
+                      free(error);
+                      YYABORT;
+                      }
+            add_op(cb, opRead, s);
+          }
+        		;
 
 write		:
-		WRITE expression ';' {add_op(cb, opWrite, NULL);}
-		;
+      		WRITE expression ';' {add_op(cb, opWrite, NULL);}
+      		;
 
 print		:
-		PRINT STRING ';'{add_op(cb, opPrint, $STRING);}
-		;
+        		PRINT STRING ';'{add_op(cb, opPrint, $STRING);}
+        		;
 
 expression	:
-		number
-		|ident {  Symbol *s = find_symbol(symtab, $ident, sLocal);
-              if (s == NULL) {
-              char *error = NULL;
-              asprintf(&error, "Unknown identifier '%s'.", $ident);
-              yyerror(error);
-              free(error);
-              YYABORT;
-              }
-              add_op(cb, opLoad, (void*) s);
-            }
-		|expression '+' expression {add_op(cb, opAdd, NULL);}
-    |expression '-' expression {add_op(cb, opSub, NULL);}
-    |expression '*' expression {add_op(cb, opMul, NULL);}
-    |expression '/' expression {add_op(cb, opDiv, NULL);}
-    |expression '%' expression {add_op(cb, opMod, NULL);}
-    |expression '^' expression {add_op(cb, opPow, NULL);}
-		|'(' expression ')'
-		| call
-		;
+          		number
+          		|ident {  Symbol *s = find_symbol(symtab, $ident, sLocal);
+                        if (s == NULL) {
+                        char *error = NULL;
+                        asprintf(&error, "Unknown identifier '%s'.", $ident);
+                        yyerror(error);
+                        free(error);
+                        YYABORT;
+                        }
+                        add_op(cb, opLoad, (void*) s);
+                      }
+          		|expression '+' expression {add_op(cb, opAdd, NULL);}
+              |expression '-' expression {add_op(cb, opSub, NULL);}
+              |expression '*' expression {add_op(cb, opMul, NULL);}
+              |expression '/' expression {add_op(cb, opDiv, NULL);}
+              |expression '%' expression {add_op(cb, opMod, NULL);}
+              |expression '^' expression {add_op(cb, opPow, NULL);}
+          		|'(' expression ')'
+          		| call
+          		;
 
-argl		:%empty {$$ = 0;}
-		|expression {$$ = 1;}
-		|argl ',' expression {$$++;}
-		;
+argl		  :
+          %empty {$$ = 0;}
+      		|expression {$$ = 1;}
+      		|argl ',' expression {$$++;}
+      		;
 
 
-condition
-    :expression EQ expression {$$ = opJeq;}
-    |expression LE expression {$$ = opJle;}
-    |expression LT expression {$$ = opJlt;}
-		;
+condition   :
+            expression EQ expression {$$ = opJeq;}
+            |expression LE expression {$$ = opJle;}
+            |expression LT expression {$$ = opJlt;}
+        		;
 
-number		:
-		INTVAL {add_op(cb, opPush, (void*) $INTVAL);}
-		;
+number		  :
+		        INTVAL {add_op(cb, opPush, (void*) $INTVAL);}
+		        ;
 
 %%
 
