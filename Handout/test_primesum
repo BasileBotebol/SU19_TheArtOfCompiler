@@ -40,6 +40,7 @@ sum = 0;
 			write n;
 			print " is prime.\n";
 		}
+		i = i + 1;
 	}
 
 	print "Sum: ";
