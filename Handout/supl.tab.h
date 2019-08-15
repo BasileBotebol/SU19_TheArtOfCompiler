@@ -85,8 +85,9 @@ union YYSTYPE
   IDlist   *idl;
   EType    t;
   EOpcode opcode;
+  BPrecord *bpr;
 
-#line 90 "supl.tab.h" /* yacc.c:1921  */
+#line 91 "supl.tab.h" /* yacc.c:1921  */
 };
 
 typedef union YYSTYPE YYSTYPE;

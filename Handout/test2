@@ -1,12 +1,9 @@
-if
-else
-ifif
-ifelse
-ifififelselse + - / * ^ *^^*^^ 
-printeder
-print
-writeer
-read write
-readread
-return
-returnelse
+{
+long b;
+b = 10;
+if(b < 1000){
+print "dans le if";
+}else{
+print "\n------------------- pas dans le if\n"; 
+}
+}

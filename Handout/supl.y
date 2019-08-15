@@ -67,6 +67,7 @@ extern char *yytext;
   IDlist   *idl;
   EType    t;
   EOpcode opcode;
+  BPrecord *bpr;
 }
 
 %code {
@@ -103,6 +104,7 @@ extern char *yytext;
 %type<idl>  identl vardecl
 %type<lval> argl
 %type<opcode> condition
+%type<bpr> IF
 
 %%
 
@@ -128,7 +130,7 @@ decll   	: %empty
         	| decll fundecl
 		;
 
-vardecl     : 	%empty
+vardecl     : 	%empty {$$ =NULL;}
 		|type
 		identl                     {
 						if($type == tVoid){
@@ -178,10 +180,11 @@ fundecl		:
     vardecl ')'
 		{
 		int argc = 0;
-		while($vardecl){
-			argc ++;
-			$vardecl = $vardecl->next;
-		}
+  		while($vardecl){
+  			argc ++;
+  			$vardecl = $vardecl->next;
+      }
+
 		if(find_func(fnl, $ident) == NULL){
 			Funclist* FLelem = (Funclist*)calloc(1, sizeof(Funclist));
 			FLelem->id = $ident;
@@ -231,22 +234,42 @@ stmt 		:%empty
 		;
 
 assign		:
-		ident '=' expression ';'	{
-						if (!find_symbol(symtab, $ident, sLocal)) {
+		ident '=' expression
+
+        ';'	{
+            Symbol *s = find_symbol(symtab, $ident, sLocal);
+						if (s == NULL) {
                                                     char *error = NULL;
                                                     asprintf(&error, "Unknown identifier '%s'.", $ident);
                                                     yyerror(error);
                                                     free(error);
                                                     YYABORT;
                                                   }
+            add_op(cb, opStore, s);
 						}
 		;
 
 if		:
-		IF '(' condition ')' stmtblock
-		| IF '(' condition ')' stmtblock  ELSE stmtblock
+      IF '(' condition ')' {/*
+        $IF = (BPrecord*)calloc(1, sizeof(BPrecord));
+        Operation *tp = add_op(cb, $condition, (void*)OPID_INVALID);
+        Operation *fb = add_op(cb, opJump, (void*)OPID_INVALID);
+        $IF->ttrue = add_backpatch($IF->ttrue, tp);
+        $IF->tfalse = add_backpatch($IF->tfalse, fb);*/
+      }
+      stmtblock{/*
+        Operation *next = add_op(cb, opJump, (void*)OPID_INVALID);
+        $IF->end = add_backpatch($IF->end, next);
+        pending_backpatch(cb, $IF->tfalse);*/
+      }
+      else{/*
+        pending_backpatch(cb, $IF->end);*/
+      }
 		;
 
+else  :%empty
+      |ELSE stmtblock
+      ;
 while		:
 		WHILE '('condition ')' stmtblock
 		;
@@ -254,7 +277,7 @@ while		:
 call		:
 		ident '(' argl ')'
 		{ Funclist* functioncalled = find_func(fnl, $ident);
-      if(find_func(fnl, $ident) == NULL){
+      if(functioncalled == NULL){
         char *error = NULL;
         asprintf(&error, "Unknown function identifier '%s'.", $ident);
         yyerror(error);
@@ -267,6 +290,7 @@ call		:
         free(error);
         YYABORT;
       }
+      add_op(cb, opCall, functioncalled->id);
 		}
 		;
 return : RETURN ';'
@@ -283,6 +307,8 @@ return : RETURN ';'
   yyerror("Void function returning non-void expression.");
   YYABORT;
   }
+
+  add_op(cb, opReturn, NULL);
 }
 ;
 
