@@ -20,7 +20,7 @@ long isPrime(long p) {
 
 void writeln(long l) {
 	write l;
-	print "\n";
+	print "";
 }
 
 long sum, n;
@@ -36,9 +36,8 @@ sum = 0;
 		if (isPrime(i) == 1) {
 			sum = sum + i;
 
-			print "\t";
 			write n;
-			print " is prime.\n";
+			print " is prime.";
 		}
 		i = i + 1;
 	}
